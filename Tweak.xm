@@ -1702,8 +1702,8 @@ static BOOL CCAConnectivitySetIdentifier(NSString *identifier, BOOL enabled) {
         return CCADynamicSetBool(CCADynamicSharedInstance(@"CoreTelephonyClient"), @[@"setCellularDataEnabled:"], enabled);
     }
     if ([lower containsString:@".hotspot"]) {
-        return CCADynamicSetBool(CCADynamicSharedInstance(@"SBTetheringController"), @[@"setPersonalHotspotEnabled:", @"setTetheringEnabled:"], enabled);
-    }
+    return NO;
+}
     return NO;
 }
 
