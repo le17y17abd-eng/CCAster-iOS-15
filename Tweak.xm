@@ -3226,7 +3226,11 @@ static void CCAConfigureOddResizedModuleLayout(UIViewController *module) {
         NSNumber *previousSelected = objc_getAssociatedObject(module.view, kCCAConnectivitySelectedStateKey);
         BOOL animateState = previousSelected && previousSelected.boolValue != selected;
         objc_setAssociatedObject(module.view, kCCAConnectivitySelectedStateKey, @(selected), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        CCAApplyOwnedCompactPresentationState(oddPresentation, selected, active, CCAConnectivityAccentColorForIdentifier(identifier), animateState);
+        UIColor *accentColor = [identifier.lowercaseString containsString:@".airdrop"] ?
+    (selected ? [UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:1.0] : [UIColor colorWithWhite:0.56 alpha:1.0]) :
+    CCAConnectivityAccentColorForIdentifier(identifier);
+
+CCAApplyOwnedCompactPresentationState(oddPresentation, selected, active, accentColor, animateState);
         CCAApplyOwnedCompactPresentationAvailability(oddPresentation, available);
         CCASetConnectivitySelectedSurface(module, selected, available, animateState);
         [module.view bringSubviewToFront:oddPresentation];
