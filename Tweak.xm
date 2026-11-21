@@ -3253,7 +3253,7 @@ CCAApplyOwnedCompactPresentationState(oddPresentation, selected, active, accentC
         proxy.frame = module.view.bounds;
         proxy.hidden = gEditModeActive || gCCAExpandedModuleOpen;
         proxy.enabled = !gEditModeActive && !gCCAExpandedModuleOpen;
-        objc_setAssociatedObject(proxy, kCCAConnectivityForwardControlKey, nativeControl, OBJC_ASSOCIATION_ASSIGN);
+        objc_setAssociatedObject(proxy, kCCAConnectivityForwardControlKey, nativeControl, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(proxy, kCCAConnectivityIdentifierKey, identifier, OBJC_ASSOCIATION_COPY_NONATOMIC);
         objc_setAssociatedObject(proxy, @selector(connectivityTileProxyTapped:), @(available), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [module.view bringSubviewToFront:proxy];
