@@ -2872,7 +2872,7 @@ static UIView *CCAFirstModuleMaterialSurface(UIView *root) {
 static UIColor *CCAConnectivityAccentColorForIdentifier(NSString *identifier) {
     NSString *lower = identifier.lowercaseString;
     if ([lower containsString:@".airplane"]) return [UIColor colorWithRed:1.0 green:0.58 blue:0.0 alpha:1.0];
-    if ([lower containsString:@".airdrop"]) return [UIColor colorWithRed:0.61 green:0.14 blue:0.96 alpha:1.0];
+    if ([lower containsString:@".airdrop"]) return [UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:1.0];
     if ([lower containsString:@".cellular"]) return [UIColor colorWithRed:0.20 green:0.78 blue:0.35 alpha:1.0];
     if ([lower containsString:@".hotspot"]) return [UIColor colorWithRed:0.20 green:0.78 blue:0.35 alpha:1.0];
     if ([lower containsString:@".bluetooth"]) return [UIColor colorWithRed:0.36 green:0.20 blue:1.0 alpha:1.0];
