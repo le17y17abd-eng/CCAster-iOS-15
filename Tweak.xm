@@ -10497,7 +10497,7 @@ static UIButton *CCAConnectivitySnapshotProxy(UIView *root, NSInteger tag, CGRec
         proxy.backgroundColor = receiving ?
     [UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:1.0] :
     [UIColor colorWithWhite:0.56 alpha:1.0];
-                                          : [UIColor colorWithWhite:1.0 alpha:0.14];
+
         proxy.layer.cornerRadius = CGRectGetHeight(frame) * 0.5;
         proxy.layer.cornerCurve = kCACornerCurveContinuous;
         proxy.layer.masksToBounds = YES;
