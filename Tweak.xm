@@ -176,6 +176,7 @@ static NSInteger const kCCAConnectivityTileActionProxyTag = 181049;
 static NSInteger const kCCAConnectivitySelectedSurfaceTag = 181050;
 static NSInteger const kCCAConnectivityBluetoothPackageGlyphTag = 181051;
 static NSInteger const kCCAOwnedDuplicateHostTag = 181052;
+static NSInteger const kCCAFullOverlayBlurTag = 181053;
 static NSInteger const kCCAConnectivityExpandedCardBaseTag = 181040;
 static NSInteger const kCCAConnectivityExpandedVPNTag = 181048;
 static CGFloat const kCCARemoveHitSize = 44.0;
@@ -781,6 +782,28 @@ static void CCANormalizePreviewCornerRadii(UIView *root, CGSize moduleSize, CGFl
 }
 
 @end
+
+// Full-screen Control Center backdrop blur. Kept behind the module collection
+// so it never intercepts touches or covers module content.
+static void CCAInstallFullOverlayBlur(UIViewController *overlay) {
+    if (!overlay.view) return;
+
+    UIView *blur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
+    if (!blur) {
+        blur = [[CCALowBlurView alloc] initWithFrame:overlay.view.bounds];
+        blur.tag = kCCAFullOverlayBlurTag;
+        blur.userInteractionEnabled = NO;
+        blur.backgroundColor = UIColor.clearColor;
+        blur.opaque = NO;
+        blur.autoresizingMask = UIViewAutoresizingFlexibleWidth |
+                                UIViewAutoresizingFlexibleHeight;
+        [overlay.view insertSubview:blur atIndex:0];
+    }
+
+    blur.frame = overlay.view.bounds;
+    blur.hidden = !gCCAControlCenterPresented;
+    blur.alpha = 1.0;
+}
 
 @interface CCATopFadeView : UIView
 @end
@@ -5805,6 +5828,7 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
 - (void)installOnOverlay:(UIViewController *)controller {
     if (!gEnabled || !controller.view) return;
     [self installQuickAccessHostOnOverlay:controller];
+    CCAInstallFullOverlayBlur(controller);
     [self installTopFadeForOverlay:controller];
     if ([gOverlayControllers containsObject:controller]) return;
     if (gBlankSpaceGestureEnabled) {
@@ -11611,6 +11635,7 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
         // reliable spot to put the quick-access host back.
         CCAsterCoordinator *coordinator = [CCAsterCoordinator shared];
         [coordinator installQuickAccessHostOnOverlay:self];
+        CCAInstallFullOverlayBlur(self);
         BOOL hasPageIndicators = [self.view viewWithTag:kCCAPageIndicatorHostTag] != nil;
         BOOL hasPager = NO;
         for (UIGestureRecognizer *gesture in self.view.gestureRecognizers) {
