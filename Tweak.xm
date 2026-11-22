@@ -10035,19 +10035,8 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
                 UIViewController *presented = owner.presentedViewController;
                 while (presented) {
                     UIView *presentedView = presented.viewIfLoaded;
-                    if (presentedView && !presentedView.hidden && presentedView.alpha > 0.01 &&
-                        presentedView.window == ((UIView *)(id)self).window) {
-                        // The native AirDrop menu can be presented above the
-                        // Control Center overlay while UIKit still reports the
-                        // overlay root as the hit view. Do not return that
-                        // root blindly: explicitly route the touch into the
-                        // presented controller's view so its option rows get
-                        // their normal UIControl actions.
-                        CGPoint presentedPoint = [(UIView *)(id)self convertPoint:point toView:presentedView];
-                        if (CGRectContainsPoint(presentedView.bounds, presentedPoint)) {
-                            UIView *presentedHit = [presentedView hitTest:presentedPoint withEvent:event];
-                            if (presentedHit) return presentedHit;
-                        }
+                    if (presentedView && !presentedView.hidden && presentedView.alpha > 0.01 && presentedView.window == ((UIView *)(id)self).window) {
+                        return nativeHit;
                     }
                     presented = presented.presentedViewController;
                 }
