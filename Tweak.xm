@@ -10688,29 +10688,22 @@ static UIView *CCAConnectivityNativeMaterialSource(UIView *root) {
 }
 
 static UIView *CCANewConnectivityMaterialView(UIView *root) {
-    UIView *source = CCAConnectivityNativeMaterialSource(root);
-    UIView *material = nil;
-    if (source && [source conformsToProtocol:@protocol(NSCopying)]) {
-        @try { material = [source copy]; } @catch (__unused NSException *exception) {}
-    }
-    if (!material && source && [source respondsToSelector:NSSelectorFromString(@"recipe")]) {
-        Class materialClass = NSClassFromString(@"MTMaterialView");
-        SEL factory = NSSelectorFromString(@"materialViewWithRecipe:");
-        if ([materialClass respondsToSelector:factory]) {
-            long long recipe = ((long long (*)(id, SEL))objc_msgSend)(source, NSSelectorFromString(@"recipe"));
-            material = ((id (*)(id, SEL, long long))objc_msgSend)(materialClass, factory, recipe);
-        }
-    }
-    if (!material) {
-        UIVisualEffectView *fallback = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark]];
-        fallback.contentView.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.055];
-        material = fallback;
-    }
+    // Use a real UIKit blur surface for CCAster's connectivity buttons/cards.
+    // The previous MTMaterialView copy inherited Apple's very subtle recipe,
+    // which made the glass effect nearly invisible on these custom surfaces.
+    (void)root;
+    UIVisualEffectView *material = [[UIVisualEffectView alloc]
+        initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterialDark]];
     material.hidden = NO;
     material.alpha = 1.0;
     material.userInteractionEnabled = NO;
     material.backgroundColor = UIColor.clearColor;
+    material.contentView.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.105];
     material.layer.cornerCurve = kCACornerCurveContinuous;
+    material.layer.borderWidth = 0.65;
+    material.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.22].CGColor;
+    material.clipsToBounds = YES;
+    material.layer.masksToBounds = YES;
     return material;
 }
 
