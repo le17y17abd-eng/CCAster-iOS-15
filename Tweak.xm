@@ -1707,8 +1707,16 @@ static BOOL CCAConnectivitySetIdentifier(NSString *identifier, BOOL enabled) {
         return CCADynamicSetBool(CCADynamicSharedInstance(@"CoreTelephonyClient"), @[@"setCellularDataEnabled:"], enabled);
     }
     if ([lower containsString:@".hotspot"]) {
-    return NO;
-}
+        // iOS 15 exposes Personal Hotspot through SpringBoard's tethering
+        // controller. Change the controller state itself; changing only the
+        // Control Center presentation leaves the hotspot running.
+        id tethering = CCADynamicSharedInstance(@"SBTetheringController");
+        return CCADynamicSetBool(tethering,
+                                 @[@"setPersonalHotspotEnabled:",
+                                   @"setTetheringEnabled:",
+                                   @"setPersonalHotspotActive:"],
+                                 enabled);
+    }
     return NO;
 }
 
@@ -6095,7 +6103,16 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
     NSString *identifier = objc_getAssociatedObject(sender, kCCAConnectivityIdentifierKey);
     if ([identifier.lowercaseString containsString:@".airdrop"]) {
         CCASetConnectivityProxyPressed(sender, NO);
-        [self expandConnectivityFromMiniCluster:(UIButton *)sender];
+        // Forward the tap to Apple's real AirDrop control. The custom
+        // expansion is only a visual reconstruction and can display the
+        // choices without delivering their selection events to iOS.
+        UIControl *nativeAirDropControl = objc_getAssociatedObject(sender, kCCAConnectivityForwardControlKey);
+        if (nativeAirDropControl) {
+            [nativeAirDropControl sendActionsForControlEvents:UIControlEventTouchUpInside];
+        } else {
+            [self expandConnectivityFromMiniCluster:(UIButton *)sender];
+        }
+        CCAHaptic();
         return;
     }
     BOOL current = CCAConnectivitySelectedForIdentifier(identifier);
