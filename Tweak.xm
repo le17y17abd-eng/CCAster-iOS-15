@@ -10573,44 +10573,63 @@ static UIButton *CCAConnectivitySnapshotProxy(UIView *root, NSInteger tag, CGRec
         [proxy addTarget:[CCAsterCoordinator shared] action:@selector(connectivityProxyTapped:) forControlEvents:UIControlEventTouchUpInside];
         [root addSubview:proxy];
     }
+
+    // Put a live UIVisualEffectView behind the compact glyph. The old proxy
+    // painted a flat snapshot of Apple's opaque round button, which covered
+    // the blur material completely and made the glass effect invisible.
+    UIView *glass = [proxy viewWithTag:181054];
+    if (!glass) {
+        glass = CCANewConnectivityMaterialView(proxy);
+        glass.tag = 181054;
+        [proxy insertSubview:glass atIndex:0];
+    }
+    glass.frame = proxy.bounds;
+    glass.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    proxy.backgroundColor = UIColor.clearColor;
+    proxy.layer.cornerRadius = CGRectGetHeight(frame) * 0.5;
+    proxy.layer.cornerCurve = kCACornerCurveContinuous;
+    proxy.layer.masksToBounds = YES;
+    proxy.clipsToBounds = YES;
+
     UIView *roundButton = CCAFindSubviewWithClassName(child.view, @"CCUIRoundButton");
     if ([roundButton isKindOfClass:[UIControl class]]) objc_setAssociatedObject(proxy, kCCAConnectivityForwardControlKey, roundButton, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     proxy.frame = frame;
+    glass.frame = proxy.bounds;
     proxy.hidden = NO;
-    proxy.clipsToBounds = NO;
+
+    // Keep only Apple's glyph, not its opaque button background, so the live
+    // blur layer remains visible underneath both compact connectivity icons.
+    UIImage *glyph = nil;
+    NSMutableArray<UIView *> *queue = roundButton ? [NSMutableArray arrayWithObject:roundButton] : [NSMutableArray array];
+    while (queue.count && !glyph) {
+        UIView *candidate = queue.firstObject;
+        [queue removeObjectAtIndex:0];
+        if ([candidate isKindOfClass:[UIImageView class]] && ((UIImageView *)candidate).image && candidate.alpha > 0.01 && !candidate.hidden) {
+            glyph = ((UIImageView *)candidate).image;
+            break;
+        }
+        [queue addObjectsFromArray:candidate.subviews];
+    }
+    if (glyph) {
+        [proxy setImage:[glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        proxy.tintColor = UIColor.whiteColor;
+        proxy.imageView.contentMode = UIViewContentModeScaleAspectFit;
+        proxy.imageView.transform = CGAffineTransformMakeScale(0.56, 0.56);
+    } else {
+        UIImage *snapshot = CCAConnectivityControlSnapshot(child, frame.size);
+        if (snapshot) [proxy setImage:snapshot forState:UIControlStateNormal];
+        proxy.imageView.transform = CGAffineTransformIdentity;
+    }
+
     if (tag == kCCAConnectivityCompactAirDropTag) {
         CFPropertyListRef rawMode = CFPreferencesCopyAppValue(CFSTR("DiscoverableMode"), CFSTR("com.apple.sharingd"));
         NSString *mode = CFBridgingRelease(rawMode);
         BOOL receiving = mode.length && [mode rangeOfString:@"Off" options:NSCaseInsensitiveSearch].location == NSNotFound;
         proxy.backgroundColor = receiving ?
-    [UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:1.0] :
-    [UIColor colorWithWhite:0.56 alpha:1.0];
-
-        proxy.layer.cornerRadius = CGRectGetHeight(frame) * 0.5;
-        proxy.layer.cornerCurve = kCACornerCurveContinuous;
-        proxy.layer.masksToBounds = YES;
-    }
-    UIImage *snapshot = CCAConnectivityControlSnapshot(child, frame.size);
-    if (snapshot) [proxy setImage:snapshot forState:UIControlStateNormal];
-    if (tag == kCCAConnectivityCompactAirDropTag) {
-        UIView *roundButton = CCAFindSubviewWithClassName(child.view, @"CCUIRoundButton");
-        NSMutableArray<UIView *> *queue = roundButton ? [NSMutableArray arrayWithObject:roundButton] : [NSMutableArray array];
-        UIImage *glyph = nil;
-        while (queue.count && !glyph) {
-            UIView *candidate = queue.firstObject;
-            [queue removeObjectAtIndex:0];
-            if ([candidate isKindOfClass:[UIImageView class]] && ((UIImageView *)candidate).image && candidate.alpha > 0.01 && !candidate.hidden) {
-                glyph = ((UIImageView *)candidate).image;
-                break;
-            }
-            [queue addObjectsFromArray:candidate.subviews];
-        }
-        if (glyph) {
-            [proxy setImage:[glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-            proxy.tintColor = UIColor.whiteColor;
-            proxy.imageView.contentMode = UIViewContentModeScaleAspectFit;
-            proxy.imageView.transform = CGAffineTransformMakeScale(0.56, 0.56);
-        }
+            [UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:0.28] :
+            [UIColor colorWithWhite:0.56 alpha:0.22];
+    } else {
+        proxy.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.12];
     }
     return proxy;
 }
@@ -10897,6 +10916,18 @@ static void CCAConfigureConnectivityLayout(UIViewController *controller) {
                     child.view.hidden = NO;
                     child.view.alpha = 1.0;
                     child.view.frame = frame;
+                    child.view.backgroundColor = UIColor.clearColor;
+                    UIView *childGlass = [child.view viewWithTag:181055];
+                    if (!childGlass) {
+                        childGlass = CCANewConnectivityMaterialView(child.view);
+                        childGlass.tag = 181055;
+                        [child.view insertSubview:childGlass atIndex:0];
+                    }
+                    childGlass.frame = child.view.bounds;
+                    childGlass.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                    childGlass.layer.cornerRadius = squareCard ? MIN(26.0, round(CGRectGetWidth(frame) * 0.17))
+                                                                : MIN(22.0, round(CGRectGetHeight(frame) * 0.38));
+                    childGlass.layer.masksToBounds = YES;
                     CCAStyleExpandedConnectivityChild(child, card, frame);
                     [scroll bringSubviewToFront:child.view];
                 }];
