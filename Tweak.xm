@@ -6116,10 +6116,29 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
         return;
     }
     if ([identifier.lowercaseString containsString:@".hotspot"]) {
-        // Use the real Apple hotspot control instead of changing only the
-        // compact proxy state. The private tethering setters vary by iOS build
-        // and may accept a call without actually stopping the radio.
+        // First ask SpringBoard's tethering controller to change the actual
+        // hotspot state. The previous code returned immediately after sending
+        // a visual control event, so this state-changing path was never tried.
         CCASetConnectivityProxyPressed(sender, NO);
+        BOOL targetHotspotState = !CCAConnectivitySelectedForIdentifier(identifier);
+        BOOL hotspotChanged = CCAConnectivitySetIdentifier(identifier, targetHotspotState);
+        if (hotspotChanged) {
+            gCCAConnectivityOptimisticStates[identifier] = @(targetHotspotState);
+            CCAHaptic();
+            for (NSNumber *delay in @[@0.25, @0.60, @1.10]) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    if (delay.doubleValue > 1.0) [gCCAConnectivityOptimisticStates removeObjectForKey:identifier];
+                    for (UIViewController *candidateOverlay in gOverlayControllers.allObjects) {
+                        for (UIViewController *module in CCACollectModuleControllers(candidateOverlay)) {
+                            if ([CCAModuleIdentifier(module) isEqualToString:identifier]) CCAConfigureOddResizedModuleLayout(module);
+                        }
+                    }
+                });
+            }
+            return;
+        }
+        // If this iOS build does not expose a usable setter, fall back to
+        // Apple's own control rather than pretending the proxy changed state.
         UIControl *nativeHotspotControl = objc_getAssociatedObject(sender, kCCAConnectivityForwardControlKey);
         if (nativeHotspotControl) {
             [nativeHotspotControl sendActionsForControlEvents:UIControlEventTouchUpInside];
@@ -10005,6 +10024,25 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
     // presented controls remain tappable. Only use the CCAster fallback when
     // the overlay itself is the otherwise-empty native hit target.
     if (nativeHit && nativeHit != (UIView *)(id)self) return nativeHit;
+    // AirDrop's native three-row receiver menu is presented by the native
+    // connectivity module. If UIKit hit-tests back to the overlay root, do
+    // not let the module fallback steal that touch from the presented menu.
+    if (nativeHit == (UIView *)(id)self && gEnabled && gCCAControlCenterPresented) {
+        for (UIViewController *overlay in gOverlayControllers.allObjects) {
+            NSMutableArray<UIViewController *> *owners = [NSMutableArray arrayWithObject:overlay];
+            [owners addObjectsFromArray:CCACollectModuleControllers(overlay) ?: @[]];
+            for (UIViewController *owner in owners) {
+                UIViewController *presented = owner.presentedViewController;
+                while (presented) {
+                    UIView *presentedView = presented.viewIfLoaded;
+                    if (presentedView && !presentedView.hidden && presentedView.alpha > 0.01 && presentedView.window == ((UIView *)(id)self).window) {
+                        return nativeHit;
+                    }
+                    presented = presented.presentedViewController;
+                }
+            }
+        }
+    }
     if (gEnabled && !gEditModeActive && !gCCAExpandedModuleOpen) {
         for (UIViewController *overlay in gOverlayControllers.allObjects) {
             if ((UIView *)(id)self != overlay.view) continue;
