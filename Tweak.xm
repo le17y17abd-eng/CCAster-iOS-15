@@ -6115,6 +6115,25 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
         CCAHaptic();
         return;
     }
+    if ([identifier.lowercaseString containsString:@".hotspot"]) {
+        // Use the real Apple hotspot control instead of changing only the
+        // compact proxy state. The private tethering setters vary by iOS build
+        // and may accept a call without actually stopping the radio.
+        CCASetConnectivityProxyPressed(sender, NO);
+        UIControl *nativeHotspotControl = objc_getAssociatedObject(sender, kCCAConnectivityForwardControlKey);
+        if (nativeHotspotControl) {
+            [nativeHotspotControl sendActionsForControlEvents:UIControlEventTouchUpInside];
+            CCAHaptic();
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                for (UIViewController *candidateOverlay in gOverlayControllers.allObjects) {
+                    for (UIViewController *module in CCACollectModuleControllers(candidateOverlay)) {
+                        if ([CCAModuleIdentifier(module) isEqualToString:identifier]) CCAConfigureOddResizedModuleLayout(module);
+                    }
+                }
+            });
+            return;
+        }
+    }
     BOOL current = CCAConnectivitySelectedForIdentifier(identifier);
     BOOL target = !current;
     CCASetConnectivityProxyPressed(sender, NO);
@@ -9957,20 +9976,23 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
 %hook UIWindow
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    if (gEnabled && gCCAControlCenterPresented && !gEditModeActive && !gCCAExpandedModuleOpen) {
-        for (UIViewController *overlay in gOverlayControllers.allObjects) {
-            if (overlay.view.window != (UIWindow *)(id)self) continue;
-            CGPoint overlayPoint = [(UIWindow *)(id)self convertPoint:point toView:overlay.view];
-            for (UIViewController *module in CCACollectModuleControllers(overlay)) {
-                if (module.view.hidden || module.view.alpha <= 0.01 || CCAModuleViewIsPageHidden(module.view)) continue;
-                if (!CGRectContainsPoint(CCAVisibleModuleFrame(module, overlay), overlayPoint)) continue;
-                CGPoint modulePoint = [(UIWindow *)(id)self convertPoint:point toView:module.view];
-                UIView *moduleHit = [module.view hitTest:modulePoint withEvent:event];
-                if (moduleHit) return moduleHit;
-            }
+    // Let UIKit hit-test first. Native popovers/action sheets (including the
+    // AirDrop receiver menu) must get their row touches before CCAster's
+    // expanded-module fallback can claim points underneath them.
+    UIView *nativeHit = %orig;
+    if (nativeHit || !gEnabled || !gCCAControlCenterPresented || gEditModeActive || gCCAExpandedModuleOpen) return nativeHit;
+    for (UIViewController *overlay in gOverlayControllers.allObjects) {
+        if (overlay.view.window != (UIWindow *)(id)self) continue;
+        CGPoint overlayPoint = [(UIWindow *)(id)self convertPoint:point toView:overlay.view];
+        for (UIViewController *module in CCACollectModuleControllers(overlay)) {
+            if (module.view.hidden || module.view.alpha <= 0.01 || CCAModuleViewIsPageHidden(module.view)) continue;
+            if (!CGRectContainsPoint(CCAVisibleModuleFrame(module, overlay), overlayPoint)) continue;
+            CGPoint modulePoint = [(UIWindow *)(id)self convertPoint:point toView:module.view];
+            UIView *moduleHit = [module.view hitTest:modulePoint withEvent:event];
+            if (moduleHit) return moduleHit;
         }
     }
-    return %orig;
+    return nil;
 }
 
 %end
@@ -9978,6 +10000,11 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
 %hook UIView
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *nativeHit = %orig;
+    // Preserve UIKit's native hit result so AirDrop menu rows and other
+    // presented controls remain tappable. Only use the CCAster fallback when
+    // the overlay itself is the otherwise-empty native hit target.
+    if (nativeHit && nativeHit != (UIView *)(id)self) return nativeHit;
     if (gEnabled && !gEditModeActive && !gCCAExpandedModuleOpen) {
         for (UIViewController *overlay in gOverlayControllers.allObjects) {
             if ((UIView *)(id)self != overlay.view) continue;
@@ -9991,7 +10018,7 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
             break;
         }
     }
-    return %orig;
+    return nativeHit ?: %orig;
 }
 
 %end
@@ -10509,7 +10536,7 @@ static UIButton *CCAConnectivitySnapshotProxy(UIView *root, NSInteger tag, CGRec
         [root addSubview:proxy];
     }
     UIView *roundButton = CCAFindSubviewWithClassName(child.view, @"CCUIRoundButton");
-    if ([roundButton isKindOfClass:[UIControl class]]) objc_setAssociatedObject(proxy, kCCAConnectivityForwardControlKey, roundButton, OBJC_ASSOCIATION_ASSIGN);
+    if ([roundButton isKindOfClass:[UIControl class]]) objc_setAssociatedObject(proxy, kCCAConnectivityForwardControlKey, roundButton, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     proxy.frame = frame;
     proxy.hidden = NO;
     proxy.clipsToBounds = NO;
