@@ -481,9 +481,9 @@ static void CCASuppressHeaderPocketMaterialForOverlay(UIViewController *overlay)
             CGFloat pocketHeight = CGRectGetHeight(candidate.bounds);
             for (UIView *child in candidate.subviews) {
                 if ([NSStringFromClass(child.class) isEqualToString:@"MTMaterialView"]) {
-    child.hidden = NO;
-    child.alpha = 1.0;
-    child.layer.opacity = 1.0;
+    child.hidden = YES;
+    child.alpha = 0.0;
+    child.layer.opacity = 0.0;
     continue;
 }
                 BOOL bottomHairline = CGRectGetWidth(child.bounds) > CGRectGetWidth(candidate.bounds) * 0.5 &&
