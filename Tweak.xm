@@ -468,25 +468,7 @@ static BOOL CCAViewTreeContainsClassName(UIView *root, NSString *className) {
 }
 
 static void CCASuppressNativeOverflowMaterialForOverlay(UIViewController *overlay) {
-    UIScrollView *scrollView = CCANativeScrollViewForOverlay(overlay);
-    if (!scrollView || gCCAExpandedModuleOpen) return;
-    CGSize overlaySize = overlay.view.bounds.size;
-    for (UIView *child in scrollView.subviews) {
-        if (CCAViewTreeContainsClassName(child, @"CCUIModuleCollectionView")) continue;
-        if (CCAViewTreeContainsClassName(child, @"CCUIHeaderPocketView")) continue;
-        BOOL hostsSensorHeader = CCAViewTreeContainsClassName(child, @"CCUISensorAttributionPrivacyHeaderView");
-        BOOL fullScreenSurface = fabs(CGRectGetWidth(child.bounds) - overlaySize.width) < 8.0 &&
-                                 fabs(CGRectGetHeight(child.bounds) - overlaySize.height) < 8.0;
-        if (!hostsSensorHeader || !fullScreenSurface) continue;
-        for (UIView *surface in child.subviews) {
-            NSString *name = NSStringFromClass(surface.class);
-            if ([name isEqualToString:@"MTMaterialView"] || [name containsString:@"VisualEffect"] || [name containsString:@"Backdrop"]) {
-                surface.hidden = YES;
-                surface.alpha = 0.0;
-                surface.layer.opacity = 0.0;
-            }
-        }
-    }
+    (void)overlay;
 }
 
 static void CCASuppressHeaderPocketMaterialForOverlay(UIViewController *overlay) {
