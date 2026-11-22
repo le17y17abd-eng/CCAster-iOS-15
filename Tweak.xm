@@ -11820,6 +11820,17 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
     %orig;
     UIViewController *overlay = [controller isKindOfClass:[UIViewController class]] ? (UIViewController *)controller : gOverlayControllers.allObjects.firstObject;
     CGFloat clamped = MIN(1.0, MAX(0.0, (CGFloat)progress));
+
+    // Keep the full-screen blur synchronized with the native presentation
+    // progress. Hide it on the very first callback that reaches zero, rather
+    // than waiting for the later didChangePresentationState/layout callback.
+    if (overlay.view) {
+        UIView *fullOverlayBlur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
+        if (fullOverlayBlur) {
+            fullOverlayBlur.hidden = clamped <= 0.001;
+        }
+    }
+
     if (overlay && CCAInteractivePagingGeometryActive()) {
         [[CCAsterCoordinator shared] applyPageTransformToOverlay:overlay animated:NO];
     }
