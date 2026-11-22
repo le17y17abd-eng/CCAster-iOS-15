@@ -10667,7 +10667,7 @@ static BOOL CCAIsOwnedConnectivityMaterial(UIView *view) {
            tag == kCCAConnectivityExpandedVPNTag;
 }
 
-static UIView *CCAConnectivityNativeMaterialSource(UIView *root) {
+static __attribute__((unused)) UIView *CCAConnectivityNativeMaterialSource(UIView *root) {
     if (!root) return nil;
     UIView *container = root;
     while (container && ![NSStringFromClass(container.class) isEqualToString:@"CCUIContentModuleContentContainerView"]) {
