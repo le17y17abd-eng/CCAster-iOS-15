@@ -774,7 +774,7 @@ static void CCANormalizePreviewCornerRadii(UIView *root, CGSize moduleSize, CGFl
             blur = ((id (*)(Class, SEL, NSString *))objc_msgSend)(filterClass, selector, @"gaussianBlur");
         }
         if (blur) {
-            [blur setValue:@3.0 forKey:@"inputRadius"];
+            [blur setValue:@10.0 forKey:@"inputRadius"];
             [blur setValue:@YES forKey:@"inputNormalizeEdges"];
             self.layer.filters = @[ blur ];
         }
@@ -7090,7 +7090,7 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
     CGFloat minimum = MIN(width, height);
     if (minimum <= 0.0) return 0.0;
     BOOL isOneByOne = fabs(width - height) <= 3.0 && minimum <= 76.0;
-    return isOneByOne ? minimum * 0.5 : MIN(32.0, MAX(22.0, minimum * 0.5 - 6.0));
+    return isOneByOne ? minimum * 0.5 : MIN(36.0, MAX(26.0, minimum * 0.55 - 6.0));
 }
 
 - (CGFloat)refinedCornerRadiusForModuleView:(UIView *)view {
