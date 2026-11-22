@@ -11888,6 +11888,17 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
         });
     }
     gCCAControlCenterPresented = state != 0;
+
+    // Update the full-screen backdrop immediately when SpringBoard changes
+    // Control Center presentation state. In particular, hide it on state 0
+    // without waiting for another layout pass or a delayed callback.
+    for (UIViewController *blurOverlay in gOverlayControllers.allObjects) {
+        UIView *fullOverlayBlur = [blurOverlay.view viewWithTag:kCCAFullOverlayBlurTag];
+        if (fullOverlayBlur) {
+            fullOverlayBlur.hidden = !gCCAControlCenterPresented;
+        }
+    }
+
     [[CCAsterCoordinator shared] beginOwnedDuplicateHostPresentationSync];
 
     if (state == 0) {
