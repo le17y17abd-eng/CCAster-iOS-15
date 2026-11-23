@@ -774,7 +774,7 @@ static void CCANormalizePreviewCornerRadii(UIView *root, CGSize moduleSize, CGFl
             blur = ((id (*)(Class, SEL, NSString *))objc_msgSend)(filterClass, selector, @"gaussianBlur");
         }
         if (blur) {
-            [blur setValue:@10.0 forKey:@"inputRadius"];
+            [blur setValue:@3.0 forKey:@"inputRadius"];
             [blur setValue:@YES forKey:@"inputNormalizeEdges"];
             self.layer.filters = @[ blur ];
         }
@@ -7090,7 +7090,7 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
     CGFloat minimum = MIN(width, height);
     if (minimum <= 0.0) return 0.0;
     BOOL isOneByOne = fabs(width - height) <= 3.0 && minimum <= 76.0;
-    return isOneByOne ? minimum * 0.5 : MIN(36.0, MAX(26.0, minimum * 0.55 - 6.0));
+    return isOneByOne ? minimum * 0.5 : MIN(32.0, MAX(22.0, minimum * 0.5 - 6.0));
 }
 
 - (CGFloat)refinedCornerRadiusForModuleView:(UIView *)view {
@@ -10667,7 +10667,7 @@ static BOOL CCAIsOwnedConnectivityMaterial(UIView *view) {
            tag == kCCAConnectivityExpandedVPNTag;
 }
 
-static __attribute__((unused)) UIView *CCAConnectivityNativeMaterialSource(UIView *root) {
+static UIView *CCAConnectivityNativeMaterialSource(UIView *root) {
     if (!root) return nil;
     UIView *container = root;
     while (container && ![NSStringFromClass(container.class) isEqualToString:@"CCUIContentModuleContentContainerView"]) {
@@ -10688,22 +10688,29 @@ static __attribute__((unused)) UIView *CCAConnectivityNativeMaterialSource(UIVie
 }
 
 static UIView *CCANewConnectivityMaterialView(UIView *root) {
-    // Use a real UIKit blur surface for CCAster's connectivity buttons/cards.
-    // The previous MTMaterialView copy inherited Apple's very subtle recipe,
-    // which made the glass effect nearly invisible on these custom surfaces.
-    (void)root;
-    UIVisualEffectView *material = [[UIVisualEffectView alloc]
-        initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterialDark]];
+    UIView *source = CCAConnectivityNativeMaterialSource(root);
+    UIView *material = nil;
+    if (source && [source conformsToProtocol:@protocol(NSCopying)]) {
+        @try { material = [source copy]; } @catch (__unused NSException *exception) {}
+    }
+    if (!material && source && [source respondsToSelector:NSSelectorFromString(@"recipe")]) {
+        Class materialClass = NSClassFromString(@"MTMaterialView");
+        SEL factory = NSSelectorFromString(@"materialViewWithRecipe:");
+        if ([materialClass respondsToSelector:factory]) {
+            long long recipe = ((long long (*)(id, SEL))objc_msgSend)(source, NSSelectorFromString(@"recipe"));
+            material = ((id (*)(id, SEL, long long))objc_msgSend)(materialClass, factory, recipe);
+        }
+    }
+    if (!material) {
+        UIVisualEffectView *fallback = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark]];
+        fallback.contentView.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.055];
+        material = fallback;
+    }
     material.hidden = NO;
     material.alpha = 1.0;
     material.userInteractionEnabled = NO;
     material.backgroundColor = UIColor.clearColor;
-    material.contentView.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.105];
     material.layer.cornerCurve = kCACornerCurveContinuous;
-    material.layer.borderWidth = 0.65;
-    material.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.22].CGColor;
-    material.clipsToBounds = YES;
-    material.layer.masksToBounds = YES;
     return material;
 }
 
