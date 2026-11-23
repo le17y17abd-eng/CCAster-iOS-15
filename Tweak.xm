@@ -788,21 +788,6 @@ static void CCANormalizePreviewCornerRadii(UIView *root, CGSize moduleSize, CGFl
 static void CCAInstallFullOverlayBlur(UIViewController *overlay) {
     if (!overlay.view) return;
 
-    // Never create a CABackdropLayer while Control Center is dismissed.
-    // A hidden backdrop can still leave a stale WindowServer blur on some iOS 15 builds.
-    if (!gCCAControlCenterPresented) {
-        UIView *staleBlur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
-        if (staleBlur) {
-            [staleBlur.layer removeAllAnimations];
-            staleBlur.layer.filters = nil;
-            staleBlur.layer.backgroundFilters = nil;
-            staleBlur.layer.opacity = 0.0;
-            @try { [staleBlur.layer setValue:@NO forKey:@"enabled"]; } @catch (__unused NSException *exception) {}
-            [staleBlur removeFromSuperview];
-        }
-        return;
-    }
-
     UIView *blur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
     if (!blur) {
         blur = [[CCALowBlurView alloc] initWithFrame:overlay.view.bounds];
@@ -828,16 +813,8 @@ static void CCARemoveFullOverlayBlur(UIViewController *overlay) {
     UIView *blur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
     if (!blur) return;
     [blur.layer removeAllAnimations];
-    // Detach the actual backdrop filter before removing its UIView wrapper.
-    // Removing only the wrapper may leave CABackdropLayer's compositor effect alive.
-    blur.layer.filters = nil;
-    blur.layer.backgroundFilters = nil;
-    blur.layer.compositingFilter = nil;
-    blur.layer.opacity = 0.0;
-    @try { [blur.layer setValue:@NO forKey:@"enabled"]; } @catch (__unused NSException *exception) {}
     blur.hidden = YES;
     blur.alpha = 0.0;
-    [blur.layer removeFromSuperlayer];
     [blur removeFromSuperview];
 }
 
@@ -4393,13 +4370,29 @@ static NSUInteger CCADerivedVisiblePageForOverlay(UIViewController *overlay) {
 }
 
 - (void)updateTopFadeForOverlay:(UIViewController *)overlay presentationAlpha:(CGFloat)alpha {
+    if (!overlay.isViewLoaded || !overlay.view) return;
+
+    // A late paging/progress callback must never resurrect the backdrop after
+    // Control Center has been dismissed. Tear down the CABackdrop-backed view
+    // while closed; installTopFadeForOverlay will recreate it on the next open.
+    if (!gCCAControlCenterPresented || alpha <= 0.001) {
+        UIView *staleFade = [overlay.view viewWithTag:kCCATopFadeTag];
+        if (staleFade) {
+            [staleFade.layer removeAllAnimations];
+            staleFade.hidden = YES;
+            staleFade.alpha = 0.0;
+            [staleFade removeFromSuperview];
+        }
+        return;
+    }
+
     UIView *fade = [overlay.view viewWithTag:kCCATopFadeTag];
     if (!fade) {
         [self installTopFadeForOverlay:overlay];
         fade = [overlay.view viewWithTag:kCCATopFadeTag];
     }
     if (!fade) return;
-    BOOL active = !gCCAExpandedModuleOpen &&
+    BOOL active = gCCAControlCenterPresented && !gCCAExpandedModuleOpen &&
         (gCCAPagerScrubbingActive || gCCAPagerTransitionActive || fabs(gCCAPagerInteractiveTranslation) > 0.5);
     CGFloat target = active ? MIN(1.0, MAX(0.0, alpha)) : 0.0;
     fade.hidden = target <= 0.001;
@@ -11943,10 +11936,25 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
     // progress. Hide it on the very first callback that reaches zero, rather
     // than waiting for the later didChangePresentationState/layout callback.
     if (overlay.view) {
+        UIView *fullOverlayBlur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
+        if (fullOverlayBlur) {
+            if (clamped <= 0.001) {
+                CCARemoveFullOverlayBlur(overlay);
+            } else {
+                fullOverlayBlur.hidden = NO;
+                fullOverlayBlur.alpha = 1.0;
+            }
+        }
+        // Remove the separate top-fade backdrop at the same presentation
+        // boundary. Do this before later edit-mode branches can return early.
         if (clamped <= 0.001) {
-            CCARemoveFullOverlayBlur(overlay);
-        } else {
-            CCAInstallFullOverlayBlur(overlay);
+            UIView *topFade = [overlay.view viewWithTag:kCCATopFadeTag];
+            if (topFade) {
+                [topFade.layer removeAllAnimations];
+                topFade.hidden = YES;
+                topFade.alpha = 0.0;
+                [topFade removeFromSuperview];
+            }
         }
     }
 
@@ -12023,10 +12031,14 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
     // Control Center presentation state. In particular, hide it on state 0
     // without waiting for another layout pass or a delayed callback.
     for (UIViewController *blurOverlay in gOverlayControllers.allObjects) {
-        if (gCCAControlCenterPresented) {
-            CCAInstallFullOverlayBlur(blurOverlay);
-        } else {
-            CCARemoveFullOverlayBlur(blurOverlay);
+        UIView *fullOverlayBlur = [blurOverlay.view viewWithTag:kCCAFullOverlayBlurTag];
+        if (fullOverlayBlur) {
+            if (gCCAControlCenterPresented) {
+                fullOverlayBlur.hidden = NO;
+                fullOverlayBlur.alpha = 1.0;
+            } else {
+                CCARemoveFullOverlayBlur(blurOverlay);
+            }
         }
     }
 
