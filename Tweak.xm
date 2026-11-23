@@ -805,6 +805,19 @@ static void CCAInstallFullOverlayBlur(UIViewController *overlay) {
     blur.alpha = 1.0;
 }
 
+// Remove the backdrop view itself when Control Center reaches the dismissed
+// state. Hiding a CABackdropLayer can leave its compositor blur visible on
+// SpringBoard on some iOS 15 builds; removing it guarantees no stale blur.
+static void CCARemoveFullOverlayBlur(UIViewController *overlay) {
+    if (!overlay.isViewLoaded) return;
+    UIView *blur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
+    if (!blur) return;
+    [blur.layer removeAllAnimations];
+    blur.hidden = YES;
+    blur.alpha = 0.0;
+    [blur removeFromSuperview];
+}
+
 @interface CCATopFadeView : UIView
 @end
 
@@ -11909,7 +11922,12 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
     if (overlay.view) {
         UIView *fullOverlayBlur = [overlay.view viewWithTag:kCCAFullOverlayBlurTag];
         if (fullOverlayBlur) {
-            fullOverlayBlur.hidden = clamped <= 0.001;
+            if (clamped <= 0.001) {
+                CCARemoveFullOverlayBlur(overlay);
+            } else {
+                fullOverlayBlur.hidden = NO;
+                fullOverlayBlur.alpha = 1.0;
+            }
         }
     }
 
@@ -11988,7 +12006,12 @@ static void CCAConfigureExpandedConnectivityChild(UIViewController *child) {
     for (UIViewController *blurOverlay in gOverlayControllers.allObjects) {
         UIView *fullOverlayBlur = [blurOverlay.view viewWithTag:kCCAFullOverlayBlurTag];
         if (fullOverlayBlur) {
-            fullOverlayBlur.hidden = !gCCAControlCenterPresented;
+            if (gCCAControlCenterPresented) {
+                fullOverlayBlur.hidden = NO;
+                fullOverlayBlur.alpha = 1.0;
+            } else {
+                CCARemoveFullOverlayBlur(blurOverlay);
+            }
         }
     }
 
